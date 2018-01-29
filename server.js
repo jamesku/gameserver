@@ -1,7 +1,38 @@
+// const express = require('express');
+// const http = require('http');
+// const url = require('url');
+// const WebSocket = require('ws');
+//
+// const app = express();
+//
+// app.use(function (req, res) {
+//   res.send({ msg: "hello" });
+// });
+//
+// const server = http.createServer(app);
+// const wss = new WebSocket.Server({ server });
+//
+// wss.on('connection', function connection(ws, req) {
+//   console.log("connection");
+//
+//   ws.on('message', function incoming(message) {
+//     console.log('received: %s', message);
+//   });
+//
+//   ws.send('something');
+// });
+//
+// server.listen(5000, function listening() {
+//   console.log('Listening on %d', server.address().port);
+// });
+
+
 const express = require('express');
 const app = express();
+const WebSocket = require('ws');
+
 var server = require('http').createServer(app);
-var io = require('socket.io')(server);
+const wss =  new WebSocket.Server({ server });
 var path = require('path');
 
 // app.use(express.static(path.join(__dirname, 'public')));
@@ -16,11 +47,11 @@ let readyCount=0;
 const port = process.env.PORT || 5000;
 
 server.listen(port, function () {
-  console.log('Server listening at port %d', port);
+  console.log('WS Server listening at port %d', port);
 });
 
 
-io.on('connection', function (client) {
+wss.on('connection', function (client, req) {
   console.log("client connected");
 
   //New Connection
@@ -28,80 +59,38 @@ io.on('connection', function (client) {
       console.log('user disconnected');
    });
 
-  // Playe Registers Name
-  client.on('setName', function (givenName) {
-    console.log("setnmaefired");
-    playerassignment++;
-    let thisplayer = 'player'+playerassignment;
-    let color = colorArray[playerassignment-1];
-    thisplayer = {
-      playernumber: playerassignment,
-      name:givenName,
-      tile:0,
-      color:color,
-      ready:false
-    };
-    gameArray.push({thisplayer:thisplayer});
-    console.log(gameArray);
+   client.on('message', function incoming(msg) {
+     msg = JSON.parse(msg);
+     switch(msg.type) {
+         case "setName":
+         console.log("setnmaefired");
+         playerassignment++;
+         let thisplayer = 'player'+playerassignment;
+         let color = colorArray[playerassignment-1];
+         thisplayer = {
+           playernumber: playerassignment,
+           name:msg.name,
+           tile:0,
+           color:color,
+           ready:false
+         };
+         gameArray.push({thisplayer:thisplayer});
+         console.log(gameArray);
 
-    client.emit('playerSetup', {
-      name: givenName,
-      playerassigned: playerassignment,
-      playercolor:color
+         client.send( JSON.stringify({
+           type:'playerSetup',
+           name: msg.name,
+           playerassigned: playerassignment,
+           playercolor:color
+         }));
+           break;
+          case "signalReady":
+          readyCount++;
+          if(readyCount===playerassignment){
+          console.log(readyCount +  'players ready to go');
+         }
+       }
     });
-  });
 
-  //New Connection
-  client.on('ready', function () {
-    readyCount++;
-    if(readyCount===playerassignment){
-    console.log(readyCount +  'players ready to go');
-    }
+
    });
-
-});
-  // // when the client emits 'add user', this listens and executes
-  // socket.on('add user', function (username) {
-  //   if (addedUser) return;
-  //
-  //   // we store the username in the socket session for this client
-  //   socket.username = username;
-  //   ++numUsers;
-  //   addedUser = true;
-  //   socket.emit('login', {
-  //     numUsers: numUsers
-  //   });
-  //
-  //   // echo globally (all clients) that a person has connected
-  //   socket.broadcast.emit('user joined', {
-  //     username: socket.username,
-  //     numUsers: numUsers
-  //   });
-  // });
-  //
-  // // when the client emits 'typing', we broadcast it to others
-  // socket.on('typing', function () {
-  //   socket.broadcast.emit('typing', {
-  //     username: socket.username
-  //   });
-  // });
-  //
-  // // when the client emits 'stop typing', we broadcast it to others
-  // socket.on('stop typing', function () {
-  //   socket.broadcast.emit('stop typing', {
-  //     username: socket.username
-  //   });
-  // });
-  //
-  // // when the user disconnects.. perform this
-  // socket.on('disconnect', function () {
-  //   if (addedUser) {
-  //     --numUsers;
-  //
-  //     // echo globally that this client has left
-  //     socket.broadcast.emit('user left', {
-  //       username: socket.username,
-  //       numUsers: numUsers
-  //     });
-  //   }
-  // });

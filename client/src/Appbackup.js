@@ -6,7 +6,12 @@ import { Input, Button} from 'semantic-ui-react';
 import socketIOClient from "socket.io-client";
 
 
-class Main extends Component {
+class App extends Component {
+
+  constructor () {
+      super();
+      this.server = socketIOClient('http://192.168.1.16:5000');
+    }
 
   state = {
     endpoint:'http://192.168.1.16:3000',
@@ -16,21 +21,38 @@ class Main extends Component {
     correct:false,
     playercolor:'black',
     ready:false,
-    data: this.props.data
+    connected:false
   };
 
-  sendMessage = () =>{
-    this.props.sendMessage()
-  }
-      // submitName = () => {
-      //      const server = socketIOClient(this.state.endpoint);
-      //      server.emit('setName', this.state.name);
-      //      }
-      //
-      // setName = (value) => {
-      //      const server = socketIOClient(this.state.endpoint);
-      //      this.setState({name: value});
-      //      };
+
+componentDidMount(){
+  // const server = socketIOClient('http://192.168.1.16:5000');
+
+  this.server.on('connect', function() {
+    this.setState({connected:true});
+  }.bind(this));
+
+   this.server.on('playerSetup', function(data) {
+     console.log(data);
+
+     this.setState({
+       playerassigned: data.playerassigned,
+       playercolor: data.playercolor});
+
+     }.bind(this)
+   );
+
+
+}
+
+
+    submitName = () => {
+           this.server.emit('setName', this.state.name);
+           }
+
+      setName = (value) => {
+           this.setState({name: value});
+           };
 
 
   inputBar(){
@@ -59,7 +81,8 @@ class Main extends Component {
 
 
   signalReadytoAPI = async () => {
-    // server.emit('ready', this.state.name);
+    this.server.emit('ready', this.state.name);
+    this.setState({ready: true});
   }
 
 
@@ -68,8 +91,8 @@ class Main extends Component {
       return(
         <div>
           <br />
-          <Button color = 'white'
-                  fluid='true'
+          <Button color = 'grey'
+                  fluid = 'true'
                   onClick = {() => this.signalReadytoAPI()}>
             Ready to Play
           < /Button>
@@ -116,13 +139,10 @@ class Main extends Component {
       }
     }
 
-setJoinedState = () =>{
-  this.setState({joined:true});
-}
 
-      render() {
+render() {
 
-        if (this.props.data.joined){
+      if (this.state.connected){
         return (
           <div style = {styles.container} >
             < div style = {{backgroundColor:this.state.playercolor, display: 'flex',
@@ -150,7 +170,7 @@ setJoinedState = () =>{
   }
 }
 
-export default Main;
+export default App;
 
 var styles = {
       container:

@@ -3,14 +3,13 @@ import './App.css';
 import 'semantic-ui-css/semantic.min.css';
 import { Input, Button} from 'semantic-ui-react';
 // import io from 'socket.io-client';
-import socketIOClient from "socket.io-client";
-
+// const WebSocket = require('ws');
 
 class App extends Component {
 
   constructor () {
       super();
-      this.server = socketIOClient('http://192.168.1.16:5000');
+      this.server = new WebSocket('ws://192.168.1.16:5000');
     }
 
   state = {
@@ -26,33 +25,40 @@ class App extends Component {
 
 
 componentDidMount(){
-  // const server = socketIOClient('http://192.168.1.16:5000');
 
-  this.server.on('connect', function() {
+  this.server.onopen = () => {
     this.setState({connected:true});
-  }.bind(this));
+  };
 
-   this.server.on('playerSetup', function(data) {
-     console.log(data);
-
-     this.setState({
-       playerassigned: data.playerassigned,
-       playercolor: data.playercolor});
-
-     }.bind(this)
-   );
-
+   this.server.onmessage = (message) => {
+     var msg = JSON.parse(message.data);
+     switch(msg.type) {
+         case "playerSetup":
+         this.setState({
+         playerassigned: msg.playerassigned,
+         playercolor: msg.playercolor});
+           break;
+         }
+      }
 
 }
 
 
     submitName = () => {
-           this.server.emit('setName', this.state.name);
-           }
+      var msg = {type:'setName', name:this.state.name}
+      this.server.send(JSON.stringify(msg));
+      }
 
-      setName = (value) => {
-           this.setState({name: value});
-           };
+      signalReadytoAPI =  () => {
+        var msg = {type:'signalReady', name:this.state.name}
+        this.server.send(JSON.stringify(msg));
+        this.setState({ready: true});
+      }
+
+
+    setName = (value) => {
+        this.setState({name: value});
+       };
 
 
   inputBar(){
@@ -80,10 +86,6 @@ componentDidMount(){
       }
 
 
-  signalReadytoAPI = async () => {
-    this.server.emit('ready', this.state.name);
-    this.setState({ready: true});
-  }
 
 
   signalReady(){
