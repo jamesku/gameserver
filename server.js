@@ -1,96 +1,134 @@
-// const express = require('express');
-// const http = require('http');
-// const url = require('url');
-// const WebSocket = require('ws');
-//
-// const app = express();
-//
-// app.use(function (req, res) {
-//   res.send({ msg: "hello" });
-// });
-//
-// const server = http.createServer(app);
-// const wss = new WebSocket.Server({ server });
-//
-// wss.on('connection', function connection(ws, req) {
-//   console.log("connection");
-//
-//   ws.on('message', function incoming(message) {
-//     console.log('received: %s', message);
-//   });
-//
-//   ws.send('something');
-// });
-//
-// server.listen(5000, function listening() {
-//   console.log('Listening on %d', server.address().port);
-// });
-
-
 const express = require('express');
 const app = express();
 const WebSocket = require('ws');
+const goGetTrivia = require('./goGetTrivia.js');
+const jsonfile = require('jsonfile');
 
 var server = require('http').createServer(app);
-const wss =  new WebSocket.Server({ server });
+const wss = new WebSocket.Server({server});
 var path = require('path');
 
-// app.use(express.static(path.join(__dirname, 'public')));
+// var fileE = './trivia/triviaEasy.json';
+// var fileM = './trivia/triviaMedium.json';
+// var fileH = './trivia/triviaHard.json';
+var easyQs = [];
+var hardQs = [];
+var mediumQs = [];
 
-let gameArray = []
-let colorArray = ['red', 'blue', 'purple', 'green', 'orange', 'yellow', 'brown', 'gray', 'gold', 'white', 'pink'];
+let webSockets = {}; // userID: webSocket
+let messageBack = "";
+let playerArray = [];
+let categories = [];
+let colorArray = [
+  'red',
+  'blue',
+  'purple',
+  'green',
+  'orange',
+  'yellow',
+  'brown',
+  'gray',
+  'gold',
+  'white',
+  'pink'
+];
 let turn = 0;
-let playerassignment=0;
-let readyCount=0;
-
+let playernumber = 0;
+let readyCount = 0;
+let trivia = [];
+let initialSplicePoint;
 
 const port = process.env.PORT || 5000;
 
-server.listen(port, function () {
+server.listen(port, function() {
   console.log('WS Server listening at port %d', port);
 });
 
-
-wss.on('connection', function (client, req) {
-  console.log("client connected");
+wss.on('connection', function(client, req) {
 
   //New Connection
-  client.on('disconnect', function () {
-      console.log('user disconnected');
-   });
+  client.on('close', function() {})
 
-   client.on('message', function incoming(msg) {
-     msg = JSON.parse(msg);
-     switch(msg.type) {
-         case "setName":
-         console.log("setnmaefired");
-         playerassignment++;
-         let thisplayer = 'player'+playerassignment;
-         let color = colorArray[playerassignment-1];
-         thisplayer = {
-           playernumber: playerassignment,
-           name:msg.name,
-           tile:0,
-           color:color,
-           ready:false
-         };
-         gameArray.push({thisplayer:thisplayer});
-         console.log(gameArray);
+  client.on('message', function incoming(msg) {
+    msg = JSON.parse(msg);
+    switch (msg.type) {
+      case "setName":
+        playernumber++;
+        //make a player
+        let thisplayer = 'player' + playernumber;
+        let playercolor = colorArray[playernumber - 1];
+        thisplayer = {
+          playernumber: playernumber,
+          name: msg.name,
+          playerposition: 1,
+          playercolor: playercolor
+        };
+        //add the player to the game
+        playerArray.push(thisplayer);
+        //record which player uses which socket
+        webSockets[thisplayer] = client;
+        //add a type for a message and send it to client and gameboard
+        thisplayer['type'] = 'playerSetup';
+        messageBack = JSON.stringify(thisplayer);
+        client.send(messageBack);
+        webSockets["gameboard"].send((messageBack))
+        //console player joined
+        console.log('connected: ' + thisplayer );
+        break;
+      case "signalReady":
+        goGetTrivia.goGetTrivia(msg.categoryNumber);
+        readyCount++;
+        //when someone is ready, send their preferred category out
+        messageBack = JSON.stringify({type: 'categorySetup', name: msg.name, playernumber: playernumber, category: msg.category});
+        webSockets["gameboard"].send((messageBack));
+        //record the category on the server
+        categories.push(msg.category);
+        //go hit the API to populate the local JSON files with trivia
 
-         client.send( JSON.stringify({
-           type:'playerSetup',
-           name: msg.name,
-           playerassigned: playerassignment,
-           playercolor:color
-         }));
-           break;
-          case "signalReady":
-          readyCount++;
-          if(readyCount===playerassignment){
-          console.log(readyCount +  'players ready to go');
-         }
-       }
-    });
+          if (readyCount === playernumber) {
+            turn = Math.floor(Math.random() * (readyCount));
 
+            trivia = goGetTrivia.returnTrivia();
+            initialSplicePoint = Math.floor(Math.random() * (trivia[1].length));
 
-   });
+            hardquestion = trivia[1].splice(initialSplicePoint, 1);
+            category = hardquestion.category;
+            console.log("category: " + category);
+            easyquestion = trivia[0].splice(initialSplicePoint, 1);
+            mediumquestion = trivia[2].splice(initialSplicePoint, 1);
+
+            messageBack = JSON.stringify({type: 'playerTurn',
+                                          turn: turn,
+                                          category:category,
+                                          hardquestion:hardquestion,
+                                          easyquestion:easyquestion,
+                                          mediumquestion:mediumquestion,
+                                        });
+            webSockets["gameboard"].send((messageBack));
+          }
+
+        //if everyone is ready pick who our first player is going to be
+        break;
+      case "gameboardconnected":
+        webSockets["gameboard"] = client;
+        console.log('connected: ' + "gameboard");
+      case "submitChoice":
+        messageBack = JSON.stringify(msg);
+        webSockets["gameboard"].send((messageBack);
+      default:
+        return;
+    }
+  });
+
+});
+
+// webSocket.on('message', function(message) {
+//   console.log('received from ' + userID + ': ' + message)
+//   var messageArray = JSON.parse(message)
+//   var toUserWebSocket = webSockets[messageArray[0]]
+//   if (toUserWebSocket) {
+//     console.log('sent to ' + messageArray[0] + ': ' + JSON.stringify(messageArray))
+//     messageArray[0] = userID
+//     toUserWebSocket.send(JSON.stringify(messageArray))
+//   }
+// })
