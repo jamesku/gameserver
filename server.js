@@ -37,6 +37,7 @@ let playernumber = 0;
 let readyCount = 0;
 let trivia = [];
 let initialSplicePoint;
+let thisPlayerDesignation;
 
 const port = process.env.PORT || 5000;
 
@@ -45,28 +46,30 @@ server.listen(port, function() {
 });
 
 wss.on('connection', function(client, req) {
-
   //New Connection
+
   client.on('close', function() {})
 
   client.on('message', function incoming(msg) {
     msg = JSON.parse(msg);
     switch (msg.type) {
       case "setName":
-        playernumber++;
-        //make a player
-        let thisplayer = 'player' + playernumber;
-        let playercolor = colorArray[playernumber - 1];
+      //make a player
+      thisPlayerDesignation = 'player' + playernumber;
+      //record which player uses which socket
+      webSockets[thisPlayerDesignation] = client;
+
+        let playercolor = colorArray[playernumber];
         thisplayer = {
           playernumber: playernumber,
-          name: msg.name,
-          playerposition: 1,
+          playername: msg.name,
+          playerboardposition: 1,
           playercolor: playercolor
         };
+        playernumber++;
+
         //add the player to the game
         playerArray.push(thisplayer);
-        //record which player uses which socket
-        webSockets[thisplayer] = client;
         //add a type for a message and send it to client and gameboard
         thisplayer['type'] = 'playerSetup';
         messageBack = JSON.stringify(thisplayer);
@@ -79,7 +82,7 @@ wss.on('connection', function(client, req) {
         goGetTrivia.goGetTrivia(msg.categoryNumber);
         readyCount++;
         //when someone is ready, send their preferred category out
-        messageBack = JSON.stringify({type: 'categorySetup', name: msg.name, playernumber: playernumber, category: msg.category});
+        messageBack = JSON.stringify({type: 'categorySetup', category: msg.category});
         webSockets["gameboard"].send((messageBack));
         //record the category on the server
         categories.push(msg.category);
@@ -90,19 +93,19 @@ wss.on('connection', function(client, req) {
 
             trivia = goGetTrivia.returnTrivia();
             initialSplicePoint = Math.floor(Math.random() * (trivia[1].length));
-
             hardquestion = trivia[1].splice(initialSplicePoint, 1);
-            category = hardquestion.category;
+            console.log(JSON.stringify(hardquestion));
+            category = hardquestion[0].category;
             console.log("category: " + category);
             easyquestion = trivia[0].splice(initialSplicePoint, 1);
             mediumquestion = trivia[2].splice(initialSplicePoint, 1);
 
-            messageBack = JSON.stringify({type: 'playerTurn',
+            messageBack = JSON.stringify({type: 'readyPlayerTurn',
                                           turn: turn,
                                           category:category,
-                                          hardquestion:hardquestion,
-                                          easyquestion:easyquestion,
-                                          mediumquestion:mediumquestion,
+                                          hardquestion:hardquestion[0],
+                                          easyquestion:easyquestion[0],
+                                          mediumquestion:mediumquestion[0],
                                         });
             webSockets["gameboard"].send((messageBack));
           }
@@ -112,9 +115,50 @@ wss.on('connection', function(client, req) {
       case "gameboardconnected":
         webSockets["gameboard"] = client;
         console.log('connected: ' + "gameboard");
+        break;
       case "submitChoice":
         messageBack = JSON.stringify(msg);
-        webSockets["gameboard"].send((messageBack);
+        webSockets["gameboard"].send(messageBack);
+        break;
+      case "readyForDifficultySelection":
+        thisPlayerDesignation = 'player' + turn;
+        console.log("answers form"+thisPlayerDesignation);
+        messageBack = '{"type":"YourTurnToSelectDifficulty"}';
+        webSockets[thisPlayerDesignation].send(messageBack);
+        break;
+      case "readyForAnswerSelection":
+        thisPlayerDesignation = 'player' + turn;
+        messageBack = '{"type":"YourTurnToSelectAnAnswer"}';
+        webSockets[thisPlayerDesignation].send(messageBack);
+        break;
+      case "hard":
+        messageBack = '{"type":hardQuestion"}';
+        webSockets["gameboard"].send(messageBack);
+        break;
+      case "medium":
+        messageBack = '{"type":"mediumQuestion"}';
+        webSockets["gameboard"].send(messageBack);
+      break;
+      case "easy":
+        messageBack = '{"type":"easyQuestion"}';
+        webSockets["gameboard"].send(messageBack);
+      break;
+      case "A":
+        messageBack = '{"type":"A"}';
+        webSockets["gameboard"].send(messageBack);
+      break;
+      case "B":
+        messageBack = '{"type":"B"}';
+        webSockets["gameboard"].send(messageBack);
+      break;
+      case "C":
+        messageBack = '{"type":"C"}';
+        webSockets["gameboard"].send(messageBack);
+      break;
+      case "D":
+        messageBack = '{"type":"D"}';
+        webSockets["gameboard"].send(messageBack);
+      break;
       default:
         return;
     }

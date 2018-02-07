@@ -28,13 +28,15 @@ class App extends Component {
   state = {
     response: '',
     name: '',
-    playernumber: 0,
+    playernumber: -1,
     correct: false,
     playercolor: 'black',
     ready: false,
     connected: false,
     category: "movies",
-    categoryNumber: 0
+    categoryNumber: 0,
+    myTurnToSelectDifficulty:false,
+    myTurnToSelectAnAnswer:false
   };
 
   componentDidMount() {
@@ -49,6 +51,14 @@ class App extends Component {
         case "playerSetup":
           this.setState({playernumber: msg.playernumber, playercolor: msg.playercolor});
           break;
+        case "YourTurnToSelectDifficulty":
+          this.setState({myTurnToSelectDifficulty: true});
+          break;
+        case "YourTurnToSelectAnAnswer":
+          this.setState({myTurnToSelectAnAnswer:true});
+          break;
+        default:
+        return(null);
       }
     }
 
@@ -74,6 +84,7 @@ class App extends Component {
       choice: choice
     }
     this.server.send(JSON.stringify(msg));
+    this.setState({myTurnToSelectAnAnswer:false, myTurnToSelectDifficulty:false});
   }
 
 
@@ -93,7 +104,7 @@ class App extends Component {
   };
 
   inputBar() {
-    if (this.state.playernumber > 0) {
+    if (this.state.playernumber >= 0) {
       return (<div style={{
           flexGrow: 1,
           flexShrink: 1,
@@ -132,27 +143,45 @@ class App extends Component {
         ) } } submitValue(value){}
 
         pickAnswers(){
-          if (this.state.ready) {
+          if (this.state.myTurnToSelectDifficulty) {
             return (<div>
               <br/>
-              <Button color='#ff3100' fluid='true' onClick={() => this.submitChoice("a")}>
+              <Button color='red' fluid='true' onClick={() => this.submitChoice("easy")}>
+                A - Easy
+              </Button>
+              <br/>
+              <Button color='yellow' fluid='true' onClick={() => this.submitChoice("medium")}>
+                B - Medium
+              </Button>
+              <br/>
+              <Button color='blue' fluid='true' onClick={() => this.submitChoice("hard")}>
+                C - Hard
+              </Button>
+            </div>)
+          }
+
+          if (this.state.myTurnToSelectAnAnswer) {
+            return (<div>
+              <br/>
+              <Button color='#ff3100' fluid='true' onClick={() => this.submitChoice("A")}>
                 A
               </Button>
               <br/>
-              <Button color='#0BB6FF' fluid='true' onClick={() => this.submitChoice("b")}>
+              <Button color='#0BB6FF' fluid='true' onClick={() => this.submitChoice("B")}>
                 B
               </Button>
               <br/>
-              <Button color='#ff8700' fluid='true' onClick={() => this.submitChoice("c")}>
+              <Button color='#ff8700' fluid='true' onClick={() => this.submitChoice("C")}>
                 C
               </Button>
               <br/>
-              <Button color='#00FF67' fluid='true' onClick={() => this.submitChoice("c")}>
+              <Button color='#00FF67' fluid='true' onClick={() => this.submitChoice("D")}>
                 D
               </Button>
               <br/>
             </div>)
-          } else if (!(this.state.playercolor === 'black')) {
+          }
+          if (!this.state.ready && !(this.state.playercolor === 'black')) {
             return (<div style={styles.container}>
               <div style={styles.selectbox}>
                 Select Your Category
